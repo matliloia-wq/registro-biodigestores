@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Registro Diario · Biodigestores</title>
+
+<meta name="description" content="Registro diario de biodigestores: biogás, pH y estabilidad FOS/TAC por método Nordmann. Funciona sin conexión.">
+<meta name="theme-color" content="#181d1b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Biodigestores">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="stylesheet" href="styles.css">
+<script src="vendor/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div>
+    <p class="brand-eyebrow">Planta &middot; control de proceso</p>
+    <h1>Registro diario de biodigestores</h1>
+    <p>Cargá los datos del día. Se guardan solos en este dispositivo.</p>
+  </div>
+  <div class="header-actions">
+    <button id="importBtn">Importar Excel</button>
+    <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none;">
+    <button id="exportBtn">Exportar a Excel</button>
+  </div>
+</header>
+
+<main>
+  <div class="update-banner" id="updateBanner">
+    Hay una versión nueva de la app. <button id="updateBtn">Actualizar ahora</button>
+  </div>
+
+  <div class="status-banner" id="statusBanner"></div>
+
+  <div class="reactor-row" id="reactorRow"></div>
+
+  <div class="panel" id="configPanel"></div>
+
+  <div class="gauge-panel">
+    <svg width="86" height="86" viewBox="0 0 86 86">
+      <circle cx="43" cy="43" r="36" fill="none" stroke="#3a4238" stroke-width="8"/>
+      <circle id="gaugeArc" cx="43" cy="43" r="36" fill="none" stroke="#e3a64b" stroke-width="8"
+        stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="226"
+        transform="rotate(-90 43 43)"/>
+    </svg>
+    <div class="gauge-stats">
+      <div class="big" id="gaugeVol">–</div>
+      <div class="label">mL biogás acumulados · <span id="gaugeReactor">–</span></div>
+      <div class="sub" id="gaugeSub">Sin registros todavía</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Cargar registro</h2>
+    <p class="hint">Dejá en blanco lo que no se midió hoy. Fecha es lo único obligatorio.</p>
+
+    <div class="group-title">General</div>
+    <div class="field-grid">
+      <div class="field"><label>Fecha *</label><input type="date" id="f_fecha"></div>
+      <div class="field"><label>Hora</label><input type="time" id="f_hora"></div>
+      <div class="field"><label>Temp (°C)</label><input type="number" step="0.1" id="f_temp"></div>
+      <div class="field">
+        <label>Alimentación</label>
+        <div class="field-inline">
+          <input type="number" step="0.1" id="f_alim">
+          <select id="f_alimu"><option value="mL">mL</option><option value="g">g</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="group-title">Biogás</div>
+    <div class="field-grid">
+      <div class="field" id="field_ciclos"><label>Ciclos</label><input type="number" step="1" id="f_ciclos">
+        <div class="field-note" id="ciclosNote"></div>
+      </div>
+      <div class="field" id="field_voldia"><label>Volumen (mL)</label><input type="number" step="0.1" id="f_voldia"></div>
+      <div class="field"><label>CH4 (%)</label><input type="number" step="0.1" id="f_ch4"></div>
+      <div class="field"><label>H2S (ppm)</label><input type="number" step="1" id="f_h2s"></div>
+      <div class="field"><label>CO2 (%)</label><input type="number" step="0.1" id="f_co2"></div>
+      <div class="field"><label>O2 (%)</label><input type="number" step="0.01" id="f_o2"></div>
+      <div class="field"><label>N2 (%)</label><input type="number" step="0.1" id="f_n2"></div>
+    </div>
+
+    <div class="group-title">Estabilidad — FOS/TAC (método Nordmann)</div>
+    <div class="field-grid">
+      <div class="field"><label>pH digerido (muestra)</label><input type="number" step="0.01" id="f_ph"></div>
+      <div class="field"><label>Masa muestra (g)</label><input type="number" step="0.01" id="f_masa"></div>
+      <div class="field"><label>Vol. ácido a pH 5,1 (mL)</label><input type="number" step="0.01" id="f_vol1"></div>
+      <div class="field"><label>Vol. ácido total a pH 4,3 (mL)</label><input type="number" step="0.01" id="f_voltotal"></div>
+      <div class="field"><label>Cac (N)</label><input type="number" step="0.001" id="f_cac"></div>
+      <div class="field"><label>HAc (mg/L)</label><input type="number" step="0.01" id="f_hac"></div>
+    </div>
+    <div class="preview-line" id="stabilityPreview">Vol2 – · TAC – · FOS – · FOS/TAC –</div>
+
+    <div class="group-title">Notas</div>
+    <div class="field-grid">
+      <div class="field wide"><label>Observaciones</label><textarea id="f_obs"></textarea></div>
+    </div>
+
+    <div class="form-actions">
+      <button id="saveBtn">Guardar registro</button>
+      <button id="clearBtn">Limpiar formulario</button>
+    </div>
+    <div id="formMsg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Historial · <span id="histReactor">–</span></h2>
+    <p class="hint">Día, acumulado, Vol2, TAC, FOS y FOS/TAC se calculan solos. Doble click en una fila (o tocar una tarjeta en el celular) para editarla.</p>
+    <div class="cards" id="regCards"></div>
+    <div class="table-scroll">
+      <table id="regTable">
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Día</th><th>Hora</th><th>Temp</th><th>Alim.</th>
+            <th>Ciclos</th><th>Vol día (mL)</th><th>Vol acum. (mL)</th>
+            <th>CH4</th><th>H2S</th><th>CO2</th><th>O2</th><th>N2</th>
+            <th>pH dig.</th><th>Masa (g)</th><th>Vol1</th><th>VolTotal</th><th>Vol2</th><th>Cac</th>
+            <th>TAC</th><th>FOS</th><th>FOS/TAC</th><th>HAc</th><th>Obs.</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="regBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none;">Todavía no hay registros para este reactor.</div>
+  </div>
+</main>
+
+<footer>
+  Los datos quedan guardados en el navegador de este dispositivo (IndexedDB) — no dependen de ninguna cuenta,
+  plan, ni de estar online, y no se envían a ningún servidor. Como quedan atados a este dispositivo/navegador
+  puntual, para pasar el registro a otra máquina (o tener un respaldo real) usá "Exportar a Excel", y del otro
+  lado "Importar Excel" con ese mismo archivo: retoma todo el historial y sigue calculando Día / acumulado /
+  FOS-TAC correctamente desde ahí. La configuración del ensayo (botella, inóculo, medidor, Cac) es fija por
+  reactor hasta que la edites.
+  <span id="storageNote" class="storage-note"></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

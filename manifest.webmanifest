@@ -1,0 +1,34 @@
+{
+  "name": "Registro Diario · Biodigestores",
+  "short_name": "Biodigestores",
+  "description": "Registro diario de biodigestores: biogás, pH y estabilidad FOS/TAC por método Nordmann. Funciona sin conexión y guarda los datos en el dispositivo.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#181d1b",
+  "theme_color": "#181d1b",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
