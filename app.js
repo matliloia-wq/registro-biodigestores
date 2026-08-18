@@ -458,6 +458,61 @@
     clearForm();
   }
 
+  // ---------- fechas y horas de Excel ----------
+  // Excel guarda fechas como número de días desde el 30/12/1899 y horas como
+  // fracción de día. Se calcula en UTC a propósito: usar el huso local (UTC-3)
+  // corre la fecha un día en la conversión de ida y vuelta.
+  const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
+  function pad2(v){ return String(v).padStart(2, '0'); }
+
+  function fechaToSerial(fechaStr){
+    const m = String(fechaStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!m) return null;
+    return (Date.UTC(+m[1], +m[2] - 1, +m[3]) - EXCEL_EPOCH) / 86400000;
+  }
+
+  function horaToSerial(horaStr){
+    const m = String(horaStr || '').match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    const seg = (+m[1]) * 3600 + (+m[2]) * 60 + (m[3] ? +m[3] : 0);
+    if (seg >= 86400) return null;
+    return seg / 86400;
+  }
+
+  // Acepta serial numérico, objeto Date o texto (ISO o dd/mm/aaaa) y siempre
+  // devuelve 'YYYY-MM-DD', que es el formato interno de la app.
+  function normalizeFecha(val){
+    if (val === undefined || val === null || val === '') return '';
+    if (val instanceof Date){
+      return `${val.getFullYear()}-${pad2(val.getMonth() + 1)}-${pad2(val.getDate())}`;
+    }
+    if (typeof val === 'number' && isFinite(val)){
+      const dias = Math.floor(val + 1e-6);
+      const d = new Date(EXCEL_EPOCH + dias * 86400000);
+      return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    }
+    const s = String(val).trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);          // dd/mm/aaaa
+    if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+    return s;
+  }
+
+  function normalizeHora(val){
+    if (val === undefined || val === null || val === '') return '';
+    if (val instanceof Date){
+      return `${pad2(val.getHours())}:${pad2(val.getMinutes())}`;
+    }
+    if (typeof val === 'number' && isFinite(val)){
+      let min = Math.round((val - Math.floor(val)) * 1440);
+      if (min >= 1440) min = 0;
+      return `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
+    }
+    const m = String(val).trim().match(/^(\d{1,2}):(\d{2})/);
+    return m ? `${pad2(m[1])}:${m[2]}` : String(val).trim();
+  }
+
   // ---------- exportar ----------
   // ---------- configuración: mapeo compartido export/import ----------
   const CONFIG_FIELDS = [
@@ -493,7 +548,8 @@
         const rows = computeRows(entries);
         if (!rows.length && !cfg) continue;
         anySheet = true;
-        const aoa = [...configRows(r, cfg), HEADERS];
+        const cabecera = configRows(r, cfg);
+        const aoa = [...cabecera, HEADERS];
         rows.forEach(row => {
           aoa.push([row.fecha, row.dia, row.hora, row.temp, row.alim, (row.alimu || ''),
             row.ciclos, row.mlporciclo, row.voldia, row.volacum,
@@ -502,7 +558,26 @@
             row.tac, row.fos, row.fostac, row.hac, row.obs]);
         });
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = HEADERS.map(() => ({ wch: 14 }));
+
+        // Fecha y hora se escriben como texto por defecto: se reemplazan por
+        // celdas numéricas con formato para que Excel las trate como tales
+        // (ordenar, filtrar por rango, restar fechas).
+        const primeraFila = cabecera.length + 1;   // 0-based: config + encabezados
+        rows.forEach((row, i) => {
+          const rIdx = primeraFila + i;
+          const serFecha = fechaToSerial(row.fecha);
+          if (serFecha !== null){
+            ws[XLSX.utils.encode_cell({ c: 0, r: rIdx })] =
+              { t: 'n', v: serFecha, z: 'dd/mm/yyyy' };
+          }
+          const serHora = horaToSerial(row.hora);
+          if (serHora !== null){
+            ws[XLSX.utils.encode_cell({ c: 2, r: rIdx })] =
+              { t: 'n', v: serHora, z: 'hh:mm' };
+          }
+        });
+
+        ws['!cols'] = HEADERS.map((h, i) => ({ wch: (i === 0 ? 12 : (i === 2 ? 9 : 14)) }));
         XLSX.utils.book_append_sheet(wb, ws, r.slice(0,31));
       }
       if (!anySheet){ alert('Todavía no hay nada cargado en ningún reactor.'); return; }
@@ -560,12 +635,16 @@
 
       for (let i = headerRowIdx + 1; i < aoa.length; i++){
         const row = aoa[i];
-        const fecha = row[RAW_COL_INDEX.fecha];
+        const fecha = normalizeFecha(row[RAW_COL_INDEX.fecha]);
         if (!fecha) continue;
         const entry = {};
         Object.keys(RAW_COL_INDEX).forEach(name => {
           entry[name] = cellToEntryValue(name, row[RAW_COL_INDEX[name]]);
         });
+        // Las columnas con formato de Excel vuelven como número o Date:
+        // se reconvierten al formato interno de la app.
+        entry.fecha = fecha;
+        entry.hora = normalizeHora(row[RAW_COL_INDEX.hora]);
         byFecha.set(entry.fecha, entry);
         rowsFound++;
       }
