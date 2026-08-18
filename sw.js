@@ -5,7 +5,7 @@
  * los archivos viejos del caché y no van a ver tu cambio nunca.
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `registro-biodigestores-${CACHE_VERSION}`;
 
 // Todo lo que la app necesita para arrancar sin conexión.
